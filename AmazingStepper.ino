@@ -75,7 +75,7 @@ void setup() {
   digitalWrite(smDirectionPin, DIRECTION_DOWN);
   lastDirection = DIRECTION_DOWN;
 
-  setupUSI_I2C(0x40); 
+  setupUSI_I2C(0x41); 
    
   seekHome();
 }
