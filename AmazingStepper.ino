@@ -1,14 +1,14 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-int smDirectionPin = 1; //Direction pin
-int smStepPin = 0; //Stepper pin
+int smDirectionPin = 3; //Direction pin
+int smStepPin = 2; //Stepper pin
 
 // Pin 3  & 4 connected to Limit switch out
-#define LMT_PIN_UP 3
-#define LMT_PIN_DOWN 2
-#define PINB_LMT_UP (PINB & 0b00010000) 
-#define PINB_LMT_DOWN (PINB & 0b00001000) 
+#define LMT_PIN_UP 0
+#define LMT_PIN_DOWN 1
+#define PINA_LMT_UP (PINA & 0b00000001) 
+#define PINA_LMT_DOWN (PINA & 0b00000010) 
 
 //TODO: check direction
 #define DIRECTION_UP 1
@@ -34,10 +34,16 @@ void setup() {
 
   swUp = false;
   swDown = false;
-  
-  //setup interrupts on limit switch pins
-  GIMSK = 0b00100000;    // turns on pin change interrupts
-  PCMSK = 0b00011000;    // turn on interrupts on pins PB3 and PB4
+
+
+  //Any logical change on INT0 generates an interrupt request.
+  MCUCR = MCUCR & (0b11111100);
+  MCUCR += 0b00000001;
+
+  GIMSK |= (1 << PCIE0);
+  PCMSK0 |= 0b00000011; //enable pin change interrupts on PA0 and PA1 (pins 13 and 12)
+
+//  SREG |= 0b10000000; //Set SREG bit I to 1  
   sei();     // enable interrupts
 
   digitalWrite(smDirectionPin, DIRECTION_DOWN);
@@ -50,8 +56,8 @@ void setup() {
 ISR(PCINT0_vect)
 {
   pinChanged=true;
-  swUp = (PINB & PINB_LMT_UP)!=0;
-  swDown = (PINB & PINB_LMT_DOWN)!=0;
+  swUp = (PINA_LMT_UP)!=0;
+  swDown = (PINA_LMT_DOWN)!=0;
 }
 
 /**
@@ -106,7 +112,7 @@ void seekHome() {
     //we used more steps than expected, or the switch is not set as expected
     while(1); // HALT!
   }
-/**** ^^^^ DEBUG ****//
+/**** ^^^^ DEBUG ****/
 
   if (!swDown) {
     stepsTaken = stepMotor(DIRECTION_DOWN,MAX_HOMING_STEPS,HOMING_SPEED);
