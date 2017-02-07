@@ -1,7 +1,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-//using https://github.com/eriksl/usitwislave
+#include "usi_i2c_slave.h" //following: http://www.instructables.com/id/ATTiny-USI-I2C-The-detailed-in-depth-and-infor/?ALLSTEPS
 
 int smDirectionPin = 3; //Direction pin
 int smStepPin = 2; //Stepper pin
@@ -16,33 +16,19 @@ int smStepPin = 2; //Stepper pin
 #define DIRECTION_UP 1
 #define DIRECTION_DOWN 0
 
-long motorPosition; //current position of the motor, only usable if homed. homing sets this to 0 if successful.
-long targetPosition;
-float moveSpeed;
-
 int lastDirection;
 
 volatile bool swUp, swDown,pinChanged;
 
 bool homed = false;
 
+long motorPosition; //current position of the motor, only usable if homed. homing sets this to 0 if successful.
+float moveSpeed;
 
-static void twi_callback(uint8_t input_buffer_length, const uint8_t *input_buffer,
-                uint8_t *output_buffer_length, uint8_t *output_buffer)
-{
-    if(input_buffer_length > 0){ //we're getting an instruction from master
-        if(*input_buffer == 1){
-            //do something
-        }
-        if(*input_buffer == 2){
-            //do something else
-        }
 
-    }else{// we're getting a write request from master
-        *output_buffer_length = 8; // set 8 bit buffer size
-        *output_buffer = 0x03; // send the device ID
-    }
-}
+//Define a reference to the I2C slave register bank pointer array
+extern char* USI_Slave_register_buffer[];
+unsigned int targetPosition = 0;
 
 void setup() {
   //setup pins
@@ -69,9 +55,25 @@ void setup() {
   digitalWrite(smDirectionPin, DIRECTION_DOWN);
   lastDirection = DIRECTION_DOWN;
 
-  usi_twi_slave(0x03, 1, *twi_callback, 0);
 
+  //Assign the target value low byte to I2C internal address 0x00
+  //Assign the target value high byte to I2C internal address 0x01
+  USI_Slave_register_buffer[0] = (unsigned char*)&targetPosition;
+  USI_Slave_register_buffer[1] = (unsigned char*)(&targetPosition)+1;
+
+  USI_I2C_Init(0x40);
+   
   seekHome();
+}
+
+//for I2C receive
+void receiveEvent(int howMany) {
+//  while (1 < Wire.available()) { // loop through all but the last
+//    char c = Wire.read(); // receive byte as a character
+//    Serial.print(c);         // print the character
+//  }
+//  int x = Wire.read();    // receive byte as an integer
+//  Serial.println(x);         // print the integer
 }
 
 //Interrupt Service Routine
@@ -165,13 +167,9 @@ void runToPosition() {
   motorPosition = motorPosition + stepsTaken * ((dir==DIRECTION_DOWN)?-1:1);
 }
 
-void loop() {
-  targetPosition = 5000;
-  moveSpeed = 0.5;
-  delay(3000);
-  while (1) {
-    runToPosition(); 
-  }
+void loop() {  
+  //TODO: Notice, right now, run to position is blocking. Meaning, you cannot change direction mid motion... and only the 'latest' target will be used each time... no queue
+  runToPosition();
 }
 
 
