@@ -1,6 +1,8 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+//using https://github.com/eriksl/usitwislave
+
 int smDirectionPin = 3; //Direction pin
 int smStepPin = 2; //Stepper pin
 
@@ -23,6 +25,24 @@ int lastDirection;
 volatile bool swUp, swDown,pinChanged;
 
 bool homed = false;
+
+
+static void twi_callback(uint8_t input_buffer_length, const uint8_t *input_buffer,
+                uint8_t *output_buffer_length, uint8_t *output_buffer)
+{
+    if(input_buffer_length > 0){ //we're getting an instruction from master
+        if(*input_buffer == 1){
+            //do something
+        }
+        if(*input_buffer == 2){
+            //do something else
+        }
+
+    }else{// we're getting a write request from master
+        *output_buffer_length = 8; // set 8 bit buffer size
+        *output_buffer = 0x03; // send the device ID
+    }
+}
 
 void setup() {
   //setup pins
@@ -48,6 +68,8 @@ void setup() {
 
   digitalWrite(smDirectionPin, DIRECTION_DOWN);
   lastDirection = DIRECTION_DOWN;
+
+  usi_twi_slave(0x03, 1, *twi_callback, 0);
 
   seekHome();
 }
