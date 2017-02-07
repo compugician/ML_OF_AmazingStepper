@@ -1,7 +1,9 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-#include "usi_i2c_slave.h" //following: http://www.instructables.com/id/ATTiny-USI-I2C-The-detailed-in-depth-and-infor/?ALLSTEPS
+//** THIS IS USING: http://members.shaw.ca/climber/avr_usi_i2c.html **//
+
+uint8_t userdata;                        // data to receive and echo from master.
 
 int smDirectionPin = 3; //Direction pin
 int smStepPin = 2; //Stepper pin
@@ -16,7 +18,8 @@ int smStepPin = 2; //Stepper pin
 #define DIRECTION_UP 1
 #define DIRECTION_DOWN 0
 
-#define LED_PIN 6
+#define HEARTBEAT_LED_PIN 8
+#define ERR_LED_PIN 7
 
 int lastDirection;
 
@@ -25,7 +28,7 @@ volatile bool swUp, swDown,pinChanged;
 bool homed = false;
 
 long motorPosition; //current position of the motor, only usable if homed. homing sets this to 0 if successful.
-float moveSpeed;
+float moveSpeed = 0.5;
 
 
 //Define a reference to the I2C slave register bank pointer array
@@ -34,7 +37,7 @@ unsigned int targetPosition = 0;
 
 void emergencyKill() {
   //turn on LED
-  digitalWrite(LED_PIN,HIGH);
+  digitalWrite(ERR_LED_PIN,HIGH);
  
   //wait forever!
   while (1) { }
@@ -43,8 +46,11 @@ void emergencyKill() {
 void setup() {
   
   //setup pins
-  pinMode(LED_PIN,OUTPUT);
-  digitalWrite(LED_PIN,LOW);
+  pinMode(HEARTBEAT_LED_PIN,OUTPUT);
+  digitalWrite(HEARTBEAT_LED_PIN,LOW);
+ 
+  pinMode(ERR_LED_PIN,OUTPUT);
+  digitalWrite(ERR_LED_PIN,LOW);
   
   pinMode(smDirectionPin, OUTPUT);
   pinMode(smStepPin, OUTPUT);
@@ -69,26 +75,11 @@ void setup() {
   digitalWrite(smDirectionPin, DIRECTION_DOWN);
   lastDirection = DIRECTION_DOWN;
 
-
-  //Assign the target value low byte to I2C internal address 0x00
-  //Assign the target value high byte to I2C internal address 0x01
-  USI_Slave_register_buffer[0] = (unsigned char*)&targetPosition;
-  USI_Slave_register_buffer[1] = (unsigned char*)(&targetPosition)+1;
-
-  USI_I2C_Init(0x40);
+  setupUSI_I2C(0x40); 
    
   seekHome();
 }
 
-//for I2C receive
-void receiveEvent(int howMany) {
-//  while (1 < Wire.available()) { // loop through all but the last
-//    char c = Wire.read(); // receive byte as a character
-//    Serial.print(c);         // print the character
-//  }
-//  int x = Wire.read();    // receive byte as an integer
-//  Serial.println(x);         // print the integer
-}
 
 //Interrupt Service Routine
 ISR(PCINT0_vect)
@@ -176,14 +167,24 @@ void seekHome() {
 
 void runToPosition() {
   long steps = targetPosition - motorPosition;
-  int dir = (steps<0) ? DIRECTION_DOWN : DIRECTION_UP;
-  int stepsTaken = stepMotor(dir, abs(steps), moveSpeed);
-  motorPosition = motorPosition + stepsTaken * ((dir==DIRECTION_DOWN)?-1:1);
+  if (steps!=0) {
+    int dir = (steps<0) ? DIRECTION_DOWN : DIRECTION_UP;
+    int stepsTaken = stepMotor(dir, abs(steps), moveSpeed);
+    motorPosition = motorPosition + stepsTaken * ((dir==DIRECTION_DOWN)?-1:1);  
+  }
 }
 
+int heartrate_delay = 100;
 void loop() {  
   //TODO: Notice, right now, run to position is blocking. Meaning, you cannot change direction mid motion... and only the 'latest' target will be used each time... no queue
   runToPosition();
+  targetPosition = userdata * 62;
+
+  digitalWrite(HEARTBEAT_LED_PIN,HIGH);
+  delay(heartrate_delay);
+  digitalWrite(HEARTBEAT_LED_PIN,LOW);
+  delay(heartrate_delay);
+  
 }
 
 
