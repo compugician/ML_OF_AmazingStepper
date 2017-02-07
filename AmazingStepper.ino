@@ -16,6 +16,8 @@ int smStepPin = 2; //Stepper pin
 #define DIRECTION_UP 1
 #define DIRECTION_DOWN 0
 
+#define LED_PIN 6
+
 int lastDirection;
 
 volatile bool swUp, swDown,pinChanged;
@@ -30,8 +32,20 @@ float moveSpeed;
 extern char* USI_Slave_register_buffer[];
 unsigned int targetPosition = 0;
 
+void emergencyKill() {
+  //turn on LED
+  digitalWrite(LED_PIN,HIGH);
+ 
+  //wait forever!
+  while (1) { }
+}
+
 void setup() {
+  
   //setup pins
+  pinMode(LED_PIN,OUTPUT);
+  digitalWrite(LED_PIN,LOW);
+  
   pinMode(smDirectionPin, OUTPUT);
   pinMode(smStepPin, OUTPUT);
 
@@ -134,7 +148,7 @@ void seekHome() {
   delay(15);
   if (stepsTaken>=MAX_UP_HOMING_BACKOFF || swUp) {
     //we used more steps than expected, or the switch is not set as expected
-    while(1); // HALT!
+     emergencyKill();
   }
 /**** ^^^^ DEBUG ****/
 
@@ -144,14 +158,14 @@ void seekHome() {
   delay(15);
   if (stepsTaken>=MAX_HOMING_STEPS || !swDown) {
     //we used more steps than expected, or the switch is not set as expected
-    while(1); // HALT!
+     emergencyKill();
   }
 
   stepsTaken = stepMotor(DIRECTION_UP,MAX_BACKOFF_STEPS,BACKOFF_SPEED);
   delay(15);
 
   if (stepsTaken>=MAX_BACKOFF_STEPS || swDown) {
-    while(1); //HALT!
+     emergencyKill();
   }
 
   stepsTaken = stepMotor(DIRECTION_UP,EXTRA_BACKOFF_STEPS,BACKOFF_SPEED);
